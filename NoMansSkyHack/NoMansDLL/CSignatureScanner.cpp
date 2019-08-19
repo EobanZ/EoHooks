@@ -49,7 +49,7 @@ char* CSignatureScanner::PatternScanInt(char* pStart, UINT_PTR RegionSize, Signa
 
 			if (Ret && (Ret != szPattern))
 			{
-				m_lastFoundAddress = reinterpret_cast<INT_PTR>(Ret);
+				m_lastFoundAddress = reinterpret_cast<UINT_PTR>(Ret);
 				return Ret;
 			}
 				

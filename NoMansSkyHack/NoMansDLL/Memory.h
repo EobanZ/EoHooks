@@ -24,15 +24,6 @@ namespace Mem {
 		return oldProt;
 	}
 
-	template<int SIZE>
-	void writeNop(UINT_PTR address)
-	{
-		auto oldProtection = Memory::protectMemory<BYTE[SIZE]>(address, PAGE_EXECUTE_READWRITE);
-		for (int i = 0; i < SIZE; i++)
-		{
-			Memory::Write<BYTE>(address + i, 0x90);
-		}
-		Memory::protectMemory<BYTE[SIZE]>(address, oldProtection);
-	}
+
 }
 

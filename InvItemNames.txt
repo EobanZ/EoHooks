@@ -1,0 +1,20 @@
+nms.exe+2733198 <- pointer zum inventar
+JET1 = Jetpack
+PROTECT = Gefahrenschutz
+ENERGY = Lebenserhaltung
+CAVE1 = Kobald
+PLANT_HOT = Feuerbeere
+SAND1 = Silikatpulver
+CATALYST1 = Natrium
+TOXIC1 = Ammoniak
+GAS2 = Radon
+LAND3 = ?
+STELLAR2 = ?
+YELLOW2 = Kupfer
+RADIO1 = Uran
+GRENFUEL1 = Instabiles Plasma
+OXYGEN = Sauerstoff
+LAUNCHFUEL = Raumschiffstart-Treibstoff
+CATALYST2 =Natriumnitrat
+FUEL1 = Kohlenstoff
+LAND1 = Ferritstaub
