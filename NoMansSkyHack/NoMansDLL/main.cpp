@@ -12,35 +12,20 @@
 UINT_PTR BaseAddress;
 UINT_PTR MultiPlierAddress;
 CSignatureScanner SigScanner;
-bool CollectMulitipier(DWORD multiplier, bool activate)
+Hooks::Detour64 jmpHook;
+bool SetupCollectMulitipier()
 {
-	
-	static bool hookActive = false;
 
-	UINT_PTR Offset = 0x469BCB;
-	UINT_PTR TrampolinAddress = 0;
+	UINT_PTR Offset = 0x46A36B;
 
 	static BYTE cave[]{
 		0xBE, 0x00, 0x00, 0x00, 0x00,
 		0x48, 0x8D, 0x53, 0x18,
 		0x49, 0x8B, 0xCB,
-		0xE9, 0x00, 0x00, 0x00, 0x00 //Richtige Addresse zum zurückkehen hier rein
 	};
 
-	if (!hookActive)
-	{
-		memcpy(&cave[1], &multiplier, sizeof(DWORD));
-		Hooks::JmpHook(BaseAddress + Offset, cave, sizeof(cave), 7, &TrampolinAddress);
-	}
-	else
-	{
-		PBYTE Tramp = reinterpret_cast<PBYTE>(TrampolinAddress);
-		if(Tramp)
-			memcpy(&Tramp[1], &multiplier, sizeof(DWORD));
-	}
+	jmpHook.Setup(BaseAddress + Offset, cave, sizeof(cave), 7, true);
 
-
-	
 
 	return true;
 }
@@ -62,25 +47,32 @@ DWORD WINAPI MainThread()
 	int collectmultiplier = 1;
 	static int lastMult = collectmultiplier;
 
+	SetupCollectMulitipier();
+
 	while (true)
 	{
 	
-		if (GetAsyncKeyState(VK_OEM_PLUS) & 1)
+		if (GetAsyncKeyState(VK_F1) & 1)
 		{
-			collectmultiplier *= 2;
+			if (!jmpHook.isActive())
+			{
+				if (jmpHook.Hook())
+				{
+					DWORD multiplier = 10;
+					UINT_PTR addr = jmpHook.GetTrampolinAddress();
+					if(addr != 0)
+						Mem::Write<DWORD>(addr+ 1, multiplier);
+				}
+					
+			}
+			else
+			{
+				jmpHook.UnHook();
+			}
 		}
-		if (GetAsyncKeyState(VK_OEM_MINUS) & 1)
-		{
-			collectmultiplier /= 2;
-			if (collectmultiplier < 1)
-				collectmultiplier = 1;
-		}
+	
 
-		if (collectmultiplier != lastMult)
-		{
-			lastMult = collectmultiplier;
-			CollectMulitipier(collectmultiplier, true);
-		}
+	
 		
 	
 
