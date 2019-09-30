@@ -1,9 +1,16 @@
 #pragma once
 #include <Windows.h>
 namespace Hooks {
-	class Detour64
+	class IHook {
+	public:
+		virtual bool Hook() = 0;
+		virtual bool UnHook() = 0;
+	};
+
+	//Usefull for inserting own assembly code somewhere in the sourc code
+	class Midfunction64 : public IHook
 	{
-	
+
 	private:
 		BYTE m_absJmp[6] = { 0xFF, 0x25, 0x00, 0x00, 0x00, 0x00 };
 		BYTE m_relJmp[5] = { 0xE9, 0x00, 0x00, 0x00, 0x00 };
@@ -21,9 +28,9 @@ namespace Hooks {
 		bool placeAbsJmpHook();
 		PVOID Allocate2GBRange(UINT_PTR address, SIZE_T dwSize);
 	public:
-		Detour64();
-		Detour64(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange);
-		~Detour64();
+		Midfunction64();
+		Midfunction64(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange);
+		~Midfunction64();
 		void Setup(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange);
 		bool Hook();
 		bool UnHook();
@@ -33,10 +40,22 @@ namespace Hooks {
 		UINT GetTramplinRawSize();
 		bool isActive();
 
-		
-		
+
+
 	};
-	
-	bool JmpHook(UINT_PTR HookAt, BYTE* Trampolin, UINT SizeOfTrampolin, UINT BytesToOverride, UINT_PTR* TrampolinAddy);
+
+	//Only for hooking functions in prologe. First try to create trampolin in 2gb range then abs. Store address above the prologe to safe space
+	class Detour64 : public IHook
+	{
+	private:
+	public:
+		Detour64();
+		~Detour64();
+		void Setup();
+		bool Hook();
+		bool UnHook();
+	};
+
+
 }
 

@@ -6,17 +6,17 @@
 #include "Memory.h"
 #include "Hooks.h"
 #include <iostream>
+#include <vector>
 
-
-//TODO: Hook als Objekte damit leichtes unhooken möglich ist
+std::vector<Hooks::IHook*> Hooks;
 UINT_PTR BaseAddress;
 UINT_PTR MultiPlierAddress;
 CSignatureScanner SigScanner;
-Hooks::Detour64 jmpHook;
-Hooks::Detour64 jmpHookAbs;
+Hooks::Midfunction64 jmpHook;
+Hooks::Midfunction64 jmpHookAbs;
+Hooks::Detour64 hooktest1;
 bool SetupRelJmpTest()
 {
-
 	UINT_PTR Offset = 0x46A36B;
 
 	static BYTE cave[]{
@@ -26,7 +26,7 @@ bool SetupRelJmpTest()
 	};
 
 	jmpHook.Setup(BaseAddress + Offset, cave, sizeof(cave), 7, true);
-
+	Hooks.push_back(&jmpHook);
 
 	return true;
 }
@@ -43,7 +43,7 @@ bool SetupAbsJmpTest()
 		0x4C, 0x8B, 0x41, 0x50
 	};
 	jmpHookAbs.Setup(BaseAddress + Offset, cave2, sizeof(cave2), 14, false);
-
+	Hooks.push_back(&jmpHookAbs);
 	return true;
 }
 
@@ -108,7 +108,15 @@ DWORD WINAPI MainThread()
 				jmpHookAbs.UnHook();
 			}
 		}
-	
+		
+		//Unhook everything
+		if (GetAsyncKeyState(VK_F12) & 1)
+		{
+			for (auto var : Hooks)
+			{
+				var->UnHook();
+			}
+		}
 
 	
 		

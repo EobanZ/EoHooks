@@ -44,9 +44,9 @@ namespace Hooks {
 		return NULL;
 	}
 
-	bool Detour64::placeRelJmpHook()
+	bool Midfunction64::placeRelJmpHook()
 	{
-		PVOID caveAddress = Detour64::Allocate2GBRange(m_hookAddress, (SIZE_T)m_trampolinRawSize + sizeof(m_relJmp));
+		PVOID caveAddress = Midfunction64::Allocate2GBRange(m_hookAddress, (SIZE_T)m_trampolinRawSize + sizeof(m_relJmp));
 		if (caveAddress == NULL)
 			return false;
 		
@@ -81,7 +81,7 @@ namespace Hooks {
 		return true;
 	}
 
-	bool Detour64::placeAbsJmpHook()
+	bool Midfunction64::placeAbsJmpHook()
 	{
 		PVOID caveAddress = VirtualAlloc(NULL, m_trampolinSize + sizeof(m_absJmp) + sizeof(UINT_PTR), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 		if (caveAddress == NULL)
@@ -123,7 +123,7 @@ namespace Hooks {
 		return true;
 	}
 
-	PVOID Detour64::Allocate2GBRange(UINT_PTR address, SIZE_T dwSize)
+	PVOID Midfunction64::Allocate2GBRange(UINT_PTR address, SIZE_T dwSize)
 	{
 		static ULONG dwAllocationGranularity;
 
@@ -163,22 +163,22 @@ namespace Hooks {
 		return NULL;
 	}
 
-	Detour64::Detour64()
+	Midfunction64::Midfunction64()
 	{
 	}
 
-	Detour64::Detour64(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange)
+	Midfunction64::Midfunction64(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange)
 	{
 		Setup(HookAt, CompiledTrampolin, SizeOfTrampolin, BytesToOverride, In2GbRange);
 	}
 
-	Detour64::~Detour64()
+	Midfunction64::~Midfunction64()
 	{
 		if (m_originalOpcodes != nullptr)
 			delete[] m_originalOpcodes;
 	}
 
-	void Detour64::Setup(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange)
+	void Midfunction64::Setup(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange)
 	{
 		m_hookAddress = HookAt;
 		m_byteArrayTrampolin = CompiledTrampolin;
@@ -191,7 +191,7 @@ namespace Hooks {
 	//Rel Jumps need min 5 bytes
 	//Abs jumps need min 14 bytes
 	//No instructions whit adresses should be overwriten (jmp, call...)
-	bool Detour64::Hook()
+	bool Midfunction64::Hook()
 	{
 		if (m_bIsHooked)
 			return false;
@@ -208,7 +208,7 @@ namespace Hooks {
 			return placeAbsJmpHook();
 	}
 
-	bool Detour64::UnHook()
+	bool Midfunction64::UnHook()
 	{
 		if (!m_bIsHooked)
 			return false;
@@ -229,7 +229,7 @@ namespace Hooks {
 		return false;
 	}
 
-	UINT_PTR Detour64::GetTrampolinAddress()
+	UINT_PTR Midfunction64::GetTrampolinAddress()
 	{
 		if (m_bIsHooked == true)
 			return m_trampolinAddress;
@@ -237,12 +237,12 @@ namespace Hooks {
 			return 0;
 	}
 
-	UINT_PTR Detour64::GetHookAddress()
+	UINT_PTR Midfunction64::GetHookAddress()
 	{
 		return m_hookAddress;
 	}
 
-	UINT Detour64::GetTrampolinSize()
+	UINT Midfunction64::GetTrampolinSize()
 	{
 		if (m_bIsHooked == true)
 			return m_trampolinSize;
@@ -250,12 +250,12 @@ namespace Hooks {
 			return 0;
 	}
 
-	UINT Detour64::GetTramplinRawSize()
+	UINT Midfunction64::GetTramplinRawSize()
 	{
 		return m_trampolinRawSize;
 	}
 
-	bool Detour64::isActive()
+	bool Midfunction64::isActive()
 	{
 		return m_bIsHooked;
 	}
