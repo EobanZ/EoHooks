@@ -4,6 +4,5 @@
 int main()
 {
 
-	HMODULE mod = LoadLibraryA("D:\\Repositories\\hacknomanssky\\NoMansSkyHack\\NoMansDLL\\Builds\\NoMansDLL.dll");
-	printf_s("Created Module: %X\n", (DWORD)mod);
+	//This should be used for injectig the dll into the target process. (Or use 3rd party DLL injector)
 }

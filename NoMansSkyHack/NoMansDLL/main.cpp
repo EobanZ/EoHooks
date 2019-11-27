@@ -8,16 +8,15 @@
 #include <iostream>
 #include <vector>
 
-std::vector<Hooks::IHook*> Hooks;
+std::vector<Hooks::IHook*> vHooks;
 UINT_PTR BaseAddress;
-UINT_PTR MultiPlierAddress;
 CSignatureScanner SigScanner;
 Hooks::Midfunction64 jmpHook;
 Hooks::Midfunction64 jmpHookAbs;
-Hooks::Detour64 hooktest1;
+
 bool SetupRelJmpTest()
 {
-	UINT_PTR Offset = 0x46A36B;
+	UINT_PTR Offset = 0x46A36B; //Needs to be updated after a new game patch. (Or use SigScanner)
 
 	static BYTE cave[]{
 		0xBE, 0x00, 0x00, 0x00, 0x00,
@@ -26,7 +25,7 @@ bool SetupRelJmpTest()
 	};
 
 	jmpHook.Setup(BaseAddress + Offset, cave, sizeof(cave), 7, true);
-	Hooks.push_back(&jmpHook);
+	vHooks.push_back(&jmpHook);
 
 	return true;
 }
@@ -43,7 +42,7 @@ bool SetupAbsJmpTest()
 		0x4C, 0x8B, 0x41, 0x50
 	};
 	jmpHookAbs.Setup(BaseAddress + Offset, cave2, sizeof(cave2), 14, false);
-	Hooks.push_back(&jmpHookAbs);
+	vHooks.push_back(&jmpHookAbs);
 	return true;
 }
 
@@ -62,7 +61,7 @@ DWORD WINAPI MainThread()
 	BaseAddress = (UINT_PTR)hMod;
 	CloseHandle(hMod);
 
-	int collectmultiplier = 1;
+	int collectmultiplier = 1; //
 	static int lastMult = collectmultiplier;
 
 	SetupRelJmpTest();
@@ -77,7 +76,7 @@ DWORD WINAPI MainThread()
 			{
 				if (jmpHook.Hook())
 				{
-					DWORD multiplier = 10;
+					DWORD multiplier = 10; //When collecting recources in NoMansSky the amount will be multiplied with this. For example: When you collect 2 Carbon you will get 2*multiplier (20)
 					UINT_PTR addr = jmpHook.GetTrampolinAddress();
 					if(addr != 0)
 						Mem::Write<DWORD>(addr+ 1, multiplier);
@@ -112,7 +111,7 @@ DWORD WINAPI MainThread()
 		//Unhook everything
 		if (GetAsyncKeyState(VK_F12) & 1)
 		{
-			for (auto var : Hooks)
+			for (auto var : vHooks)
 			{
 				var->UnHook();
 			}
