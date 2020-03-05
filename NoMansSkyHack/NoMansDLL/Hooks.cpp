@@ -275,7 +275,7 @@ namespace Hooks {
 			delete[] m_originalOpcodes;
 	}
 
-	void Detour64::Setup(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge = false)
+	void Detour64::Setup(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge)
 	{
 		m_oFuctionAddress = HookAt;
 		m_hFuctionAddress = HookFunc;
@@ -294,6 +294,49 @@ namespace Hooks {
 		return success;
 	}
 
+	bool Detour64::UnHook()
+	{
+		if (!m_bIsHooked)
+			return false;
+
+		//Recreate Original State
+		DWORD dwOld = 0;
+		VirtualProtect((LPVOID)m_oFuctionAddress, m_overridenBytesCount, PAGE_EXECUTE_READWRITE, &dwOld);
+		memcpy((LPVOID)m_oFuctionAddress, m_originalOpcodes, m_overridenBytesCount);
+		VirtualProtect((LPVOID)m_oFuctionAddress, m_overridenBytesCount, dwOld, NULL);
+		delete[] m_originalOpcodes;
+		m_originalOpcodes = nullptr;
+
+		//Free Allocated Memory
+		if (m_trampolinAddress != 0)
+			VirtualFree((PVOID)m_trampolinAddress, 0, MEM_RELEASE);
+		if (m_gatewayAddress != 0)
+			VirtualFree((PVOID)m_gatewayAddress, 0, MEM_RELEASE);
+		m_trampolinAddress = 0;
+		m_gatewayAddress = 0;
+		m_bIsHooked = false;
+
+		return true;
+	}
+
+	UINT_PTR Detour64::GetOriginalFuctionAddress()
+	{
+		return m_oFuctionAddress;
+	}
+
+	UINT_PTR Detour64::GetGatewayAddress()
+	{
+		if(m_bIsHooked)
+			return m_gatewayAddress;
+		
+		return 0;
+	}
+
+	UINT_PTR Detour64::GetHookFunctionAddress()
+	{
+		return m_hFuctionAddress;
+	}
+
 	bool Detour64::TryHookWithTrampolin()
 	{
 		if (m_overridenBytesCount < 5)
@@ -301,8 +344,6 @@ namespace Hooks {
 			Error("Not enough bytes for a rel jump");
 			return false;
 		}
-
-
 
 		PVOID trampolinAddress = this->AllocateIn2GBRange(m_oFuctionAddress, 14); //14 size needed to do an absolute jump. instructions + address
 		if (trampolinAddress == NULL)
@@ -335,8 +376,10 @@ namespace Hooks {
 		VirtualProtect(reinterpret_cast<PVOID>(m_oFuctionAddress), m_overridenBytesCount, PAGE_EXECUTE_READWRITE, &dwOld);
 
 		DWORD newOffset = m_trampolinAddress - m_oFuctionAddress - 5;
-		*((BYTE*)m_oFuctionAddress) = 0xE9; //JMP
-		*((BYTE*)m_oFuctionAddress + 1) = newOffset; 
+		memcpy((LPVOID)m_oFuctionAddress, m_relJmp, sizeof(m_relJmp));
+		memcpy((LPVOID)(m_oFuctionAddress + 1), &newOffset, sizeof(DWORD));
+		//*((BYTE*)m_oFuctionAddress) = 0xE9; //JMP //replaced with above
+		//*((DWORD*)(m_oFuctionAddress + 1)) = newOffset; 
 		for (size_t i = 5; i < m_overridenBytesCount; i++)
 		{
 			*((BYTE*)m_oFuctionAddress + i) = 0x90;
@@ -353,8 +396,43 @@ namespace Hooks {
 
 	bool Detour64::TryHookWithAbsJmpInProloge()
 	{
-		
-		return false;
+		if (m_overridenBytesCount < 14)
+		{
+			Error("Not enough bytes for an absulute jump");
+			return false;
+		}
+
+		PVOID Gateway = VirtualAlloc(0, m_overridenBytesCount + 14, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+		if (Gateway == NULL)
+			return false;
+
+		//Save original bytes
+		m_originalOpcodes = new BYTE[m_overridenBytesCount];
+		memcpy(m_originalOpcodes, (PVOID)m_oFuctionAddress, m_overridenBytesCount);
+
+		//Get the return address the gateway will jump to
+		UINT_PTR returnAddress = m_oFuctionAddress + 14;
+
+		//Fill the gateway with stolen byets and jmp back instruction
+		m_gatewayAddress = reinterpret_cast<UINT_PTR>(Gateway);
+		memcpy(Gateway, m_originalOpcodes, sizeof(m_originalOpcodes)); //Fill stolen bytes
+		memcpy(reinterpret_cast<PVOID>(m_gatewayAddress + sizeof(m_originalOpcodes)), m_absJmp, sizeof(m_absJmp)); //Fill abs jump instructions
+		memcpy(reinterpret_cast<PVOID>(m_gatewayAddress + sizeof(m_originalOpcodes) + sizeof(m_absJmp)), &returnAddress, sizeof(UINT_PTR)); //Fill return address
+
+		//Place the hook
+		DWORD dwOld = 0;
+		VirtualProtect((PVOID)m_oFuctionAddress, m_overridenBytesCount, PAGE_EXECUTE_READWRITE, &dwOld);
+		memcpy((PVOID)m_oFuctionAddress, m_absJmp, sizeof(m_absJmp));
+		memcpy((PVOID)(m_oFuctionAddress + sizeof(m_absJmp)), &m_hFuctionAddress, sizeof(UINT_PTR));
+
+		for (size_t i = 14; i < m_overridenBytesCount; i++)
+		{
+			*((BYTE*)m_oFuctionAddress + i) = 0x90;
+		}
+		VirtualProtect((PVOID)m_oFuctionAddress, m_overridenBytesCount, dwOld, NULL);
+
+		return true;
+
 	}
 
 	PVOID Detour64::AllocateIn2GBRange(UINT_PTR address, SIZE_T dwSize)

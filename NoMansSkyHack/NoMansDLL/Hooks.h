@@ -50,7 +50,7 @@ namespace Hooks {
 
 	};
 
-	//Only for hooking functions in prologe. First try to create trampolin in 2gb range then abs. Store address above the prologe to safe space
+	//Only for hooking functions in prologe. 
 	class Detour64 : public IHook
 	{
 	private:
@@ -67,14 +67,14 @@ namespace Hooks {
 
 	public:
 		Detour64();
-		Detour64(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge);
+		Detour64(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge = false);
 		~Detour64();
-		void Setup(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge);
+		void Setup(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge = false);
 		bool Hook();
 		bool UnHook();
 		bool isActive();
 		UINT_PTR GetOriginalFuctionAddress();
-		UINT_PTR GetGatewayAddress();
+		UINT_PTR GetGatewayAddress(); //cast this to the original function prototype an call it after executing your own code
 		UINT_PTR GetHookFunctionAddress();
 
 	private:
