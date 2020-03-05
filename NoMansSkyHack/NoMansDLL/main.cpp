@@ -14,6 +14,25 @@ CSignatureScanner SigScanner;
 Hooks::Midfunction64 jmpHook;
 Hooks::Midfunction64 jmpHookAbs;
 
+Hooks::Detour64 detRel;
+Hooks::Detour64 detAbs;
+
+typedef int(__stdcall* detFuc)(int arg1, int arg2); //this should be the correct function prototype u want to hook
+detFuc orgiFuncRel = 0;
+detFuc orgiFuncAbs = 0;
+
+int __stdcall myFunc1(int one, int two)
+{
+	//bla
+	orgiFuncRel(one, two);
+}
+
+int __stdcall myFunc2(int one, int two)
+{
+
+	orgiFuncAbs(one, two);
+}
+
 bool SetupRelJmpTest()
 {
 	UINT_PTR Offset = 0x46A36B; //Needs to be updated after a new game patch. (Or use SigScanner)
@@ -44,6 +63,21 @@ bool SetupAbsJmpTest()
 	jmpHookAbs.Setup(BaseAddress + Offset, cave2, sizeof(cave2), 14, false);
 	vHooks.push_back(&jmpHookAbs);
 	return true;
+}
+
+bool SetupDetourTest()
+{
+	detRel.Setup(0xDEADBEEF, reinterpret_cast<UINT_PTR>(&myFunc1), 6);
+	detRel.Hook();
+	orgiFuncRel = (detFuc)detRel.GetGatewayAddress();
+	vHooks.push_back(&detRel);
+
+	detAbs.Setup(0xBEEFDEAD, (UINT_PTR)myFunc2, 16, true);
+	detAbs.Hook();
+	orgiFuncAbs = (detFuc)detAbs.GetGatewayAddress();
+	vHooks.push_back(&detAbs);
+
+
 }
 
 
@@ -116,10 +150,7 @@ DWORD WINAPI MainThread()
 				var->UnHook();
 			}
 		}
-
-	
 		
-	
 
 	}
 	
