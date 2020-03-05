@@ -260,4 +260,141 @@ namespace Hooks {
 		return m_bIsHooked;
 	}
 
+	Detour64::Detour64()
+	{
+	}
+
+	Detour64::Detour64(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge)
+	{
+		this->Setup(HookAt, HookFunc, BytesToOverride, useAbsJmpInProloge);
+	}
+
+	Detour64::~Detour64()
+	{
+		if (m_originalOpcodes != nullptr)
+			delete[] m_originalOpcodes;
+	}
+
+	void Detour64::Setup(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge = false)
+	{
+		m_oFuctionAddress = HookAt;
+		m_hFuctionAddress = HookFunc;
+		m_overridenBytesCount = BytesToOverride;
+		m_useAbsJmpInProloge = useAbsJmpInProloge;
+	}
+
+	bool Detour64::Hook()
+	{
+		bool success = false;
+		if (m_useAbsJmpInProloge)
+			success = TryHookWithAbsJmpInProloge();
+		else
+			success = TryHookWithTrampolin();
+		m_bIsHooked = success;
+		return success;
+	}
+
+	bool Detour64::TryHookWithTrampolin()
+	{
+		if (m_overridenBytesCount < 5)
+		{
+			Error("Not enough bytes for a rel jump");
+			return false;
+		}
+
+
+
+		PVOID trampolinAddress = this->AllocateIn2GBRange(m_oFuctionAddress, 14); //14 size needed to do an absolute jump. instructions + address
+		if (trampolinAddress == NULL)
+		{
+			Error("Could not find memory to allocate near oFunction. TryHookWithAbsJmpInProloge()");
+			return false;
+		}
+
+		//Fill the Trampolin with jump instructions and address to jump to
+		m_trampolinAddress = reinterpret_cast<UINT_PTR>(trampolinAddress);
+		memcpy(reinterpret_cast<PVOID>(m_trampolinAddress), m_absJmp, sizeof(m_absJmp)); //Create instruction for an absulute jmp in trampolin
+		memcpy(reinterpret_cast<PVOID>(m_trampolinAddress + sizeof(m_absJmp)), reinterpret_cast<PVOID>(m_hFuctionAddress), sizeof(UINT_PTR)); //Copy abs address of hook function where to jump from trampolin
+
+		//Save Original Opcode Bytes
+		m_originalOpcodes = new BYTE[m_overridenBytesCount];
+		memcpy(m_originalOpcodes, reinterpret_cast<PVOID>(m_oFuctionAddress), m_overridenBytesCount);
+
+		//Create the Gateway. Call this gateway as original fuction after the hook functions ended
+		PVOID Gateway = VirtualAlloc(0, m_overridenBytesCount + 14, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+		if (Gateway == NULL)
+			return false;
+		m_gatewayAddress = reinterpret_cast<UINT_PTR>(Gateway);
+		memcpy(Gateway, m_originalOpcodes, m_overridenBytesCount); //Write the stolen opcodes into the gateway
+		UINT_PTR returnAddress = m_oFuctionAddress + 5; //The Gateway needs to know where to jump back in the original function: right after the jump we placed
+		memcpy(reinterpret_cast<PVOID>(m_gatewayAddress + m_overridenBytesCount), m_absJmp, sizeof(m_absJmp)); //Copy abs jmp instructions after the stolen byte opcodes
+		memcpy(reinterpret_cast<PVOID>(m_gatewayAddress + m_overridenBytesCount + sizeof(m_absJmp)), &returnAddress, sizeof(UINT_PTR)); //Adding the adress to jump back to the original function from gateway
+
+		//Place the hook
+		DWORD dwOld = 0;
+		VirtualProtect(reinterpret_cast<PVOID>(m_oFuctionAddress), m_overridenBytesCount, PAGE_EXECUTE_READWRITE, &dwOld);
+
+		DWORD newOffset = m_trampolinAddress - m_oFuctionAddress - 5;
+		*((BYTE*)m_oFuctionAddress) = 0xE9; //JMP
+		*((BYTE*)m_oFuctionAddress + 1) = newOffset; 
+		for (size_t i = 5; i < m_overridenBytesCount; i++)
+		{
+			*((BYTE*)m_oFuctionAddress + i) = 0x90;
+		}
+
+		VirtualProtect(reinterpret_cast<PVOID>(m_oFuctionAddress), m_overridenBytesCount, dwOld, NULL);
+
+		
+		return true;
+
+
+		
+	}
+
+	bool Detour64::TryHookWithAbsJmpInProloge()
+	{
+		
+		return false;
+	}
+
+	PVOID Detour64::AllocateIn2GBRange(UINT_PTR address, SIZE_T dwSize)
+	{
+		static ULONG dwAllocationGranularity;
+
+		if (!dwAllocationGranularity)
+		{
+			SYSTEM_INFO si;
+			GetSystemInfo(&si);
+			dwAllocationGranularity = si.dwAllocationGranularity;
+		}
+
+		UINT_PTR min, max, addr, add = dwAllocationGranularity - 1, mask = ~add;
+
+		min = address >= 0x80000000 ? (address - 0x80000000 + add) & mask : 0;
+		max = address < (UINTPTR_MAX - 0x80000000) ? (address + 0x80000000) & mask : UINTPTR_MAX;
+
+		::MEMORY_BASIC_INFORMATION mbi;
+		do
+		{
+			if (!VirtualQuery((void*)min, &mbi, sizeof(mbi))) return NULL;
+
+			min = (UINT_PTR)mbi.BaseAddress + mbi.RegionSize;
+
+			if (mbi.State == MEM_FREE)
+			{
+				addr = ((UINT_PTR)mbi.BaseAddress + add) & mask;
+
+				if (addr < min && dwSize <= (min - addr))
+				{
+					if (addr = (UINT_PTR)VirtualAlloc((PVOID)addr, dwSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE))
+						return (PVOID)addr;
+				}
+			}
+
+
+		} while (min < max);
+
+		return NULL;
+	}
+
 }
