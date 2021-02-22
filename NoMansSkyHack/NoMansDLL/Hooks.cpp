@@ -255,7 +255,7 @@ namespace Hooks {
 		return m_trampolinRawSize;
 	}
 
-	bool Midfunction64::isActive()
+	bool Midfunction64::IsActive()
 	{
 		return m_bIsHooked;
 	}
@@ -473,6 +473,65 @@ namespace Hooks {
 		} while (min < max);
 
 		return NULL;
+	}
+
+	VTableHook::VTableHook(UINT_PTR VTableAddress, UINT TableIndex, UINT_PTR HookFunc)
+	{	
+		this->Setup(VTableAddress, TableIndex, HookFunc);
+	}
+
+	VTableHook::VTableHook(UINT_PTR VTableEntryAddress, UINT_PTR HookFunc)
+	{
+		this->Setup(VTableEntryAddress, HookFunc);
+	}
+
+	void VTableHook::Setup(UINT_PTR VTableAddress, UINT TableIndex, UINT_PTR HookFunc)
+	{
+		UINT_PTR entryAddr = VTableAddress + (TableIndex * sizeof(UINT_PTR));
+		this->Setup(entryAddr, HookFunc);
+		this->m_vtableAddress = VTableAddress;
+		this->m_vtableIndex = TableIndex;
+	}
+
+	void VTableHook::Setup(UINT_PTR VTableEntryAddress, UINT_PTR HookFunc)
+	{
+		this->m_vtableEntryAddress = VTableEntryAddress;
+		this->m_hFunctionAddress = HookFunc;
+	}
+
+	bool VTableHook::Hook()
+	{
+		//TODO: Add other option where a copy of the VTable is created, etries are overwritten and the vtable pointer in the target class instance is changed <- bcs of vtable checks
+
+		DWORD dwOld = 0;
+		VirtualProtect((LPVOID)m_vtableEntryAddress, sizeof(LPVOID), PAGE_EXECUTE_READWRITE, &dwOld);
+		memcpy((LPVOID)m_vtableEntryAddress, &m_hFunctionAddress, sizeof(m_hFunctionAddress)); //replace function address in vtable with new fuction address
+		VirtualProtect((LPVOID)m_vtableEntryAddress, sizeof(LPVOID), dwOld, NULL);
+		m_bHooked = true;
+
+		return true;
+	}
+
+	bool VTableHook::UnHook()
+	{
+		if (m_bCopyCreated && m_pCopy != nullptr && m_instanceAddress != 0)
+		{
+			//TODO: If vtable copy was created free and set instance vt to original
+			m_bHooked = false;
+			return true;
+		}
+		
+		DWORD dwOld = 0;
+		VirtualProtect((LPVOID)m_vtableEntryAddress, sizeof(LPVOID), PAGE_EXECUTE_READWRITE, &dwOld);
+		memcpy((LPVOID)m_vtableEntryAddress, &m_oFunctionAddress, sizeof(m_oFunctionAddress)); 
+		VirtualProtect((LPVOID)m_vtableEntryAddress, sizeof(LPVOID), dwOld, NULL);
+		m_bHooked = false;
+		return true;
+	}
+
+	bool VTableHook::IsActive()
+	{
+		return m_bHooked;
 	}
 
 }

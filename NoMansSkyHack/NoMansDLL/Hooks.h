@@ -11,6 +11,7 @@ namespace Hooks {
 	public:
 		virtual bool Hook() = 0;
 		virtual bool UnHook() = 0;
+		virtual bool IsActive() = 0;
 	};
 
 	//Usefull for inserting own assembly code somewhere in the sourc code
@@ -38,13 +39,13 @@ namespace Hooks {
 		Midfunction64(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange);
 		~Midfunction64();
 		void Setup(UINT_PTR HookAt, PBYTE CompiledTrampolin, UINT SizeOfTrampolin, UINT BytesToOverride, bool In2GbRange);
-		bool Hook();
-		bool UnHook();
+		bool Hook() override;
+		bool UnHook() override;
 		UINT_PTR GetTrampolinAddress();
 		UINT_PTR GetHookAddress();
 		UINT GetTrampolinSize();
 		UINT GetTramplinRawSize();
-		bool isActive();
+		bool IsActive() override;
 
 
 
@@ -70,9 +71,9 @@ namespace Hooks {
 		Detour64(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge = false);
 		~Detour64();
 		void Setup(UINT_PTR HookAt, UINT_PTR HookFunc, UINT BytesToOverride, bool useAbsJmpInProloge = false);
-		bool Hook();
-		bool UnHook();
-		bool isActive();
+		bool Hook() override;
+		bool UnHook() override;
+		bool IsActive() override;
 		UINT_PTR GetOriginalFuctionAddress();
 		UINT_PTR GetGatewayAddress(); //cast this to the original function prototype an call it after executing your own code
 		UINT_PTR GetHookFunctionAddress();
@@ -81,6 +82,36 @@ namespace Hooks {
 		bool TryHookWithTrampolin();
 		bool TryHookWithAbsJmpInProloge();
 		PVOID AllocateIn2GBRange(UINT_PTR address, SIZE_T dwSize);
+	};
+
+	//TODO: maybe create extra class for InstanceVtableHooking?? InplaceVtableHook, InstanceVtableHook?
+	class VTableHook : public IHook {
+	private:
+		UINT_PTR m_vtableAddress = 0;
+		UINT_PTR m_vtableEntryAddress = 0;
+		UINT m_vtableIndex = 0;
+		UINT_PTR m_oFunctionAddress = 0;
+		UINT_PTR m_hFunctionAddress = 0;
+		UINT_PTR m_instanceAddress = 0;
+		bool m_bHooked = false;
+		bool m_bCopyCreated = false;
+		LPVOID m_pCopy = nullptr;
+
+	public:
+		VTableHook(UINT_PTR VTableAddress, UINT TableIndex, UINT_PTR HookFunc);
+		VTableHook(UINT_PTR VTableEntryAddress, UINT_PTR HookFunc);
+		void Setup(UINT_PTR VTableAddress, UINT TableIndex, UINT_PTR HookFunc);
+		void Setup(UINT_PTR VTableEntryAddress, UINT_PTR HookFunc);
+		void Setup(UINT_PTR InstanceAddress, UINT TableIndex, bool createVtableCopy, UINT_PTR HookFunc); //TODO:
+		UINT_PTR GetHookFunctionAddress();
+		UINT_PTR GetOriginalFuctionAddress();
+		UINT_PTR GetOriginalVTableAddress();
+		UINT_PTR GetVTableCopyAddress();
+		UINT_PTR GetUsedInstanceAddress();
+		UINT GetVTableIndex();
+		bool Hook() override;
+		bool UnHook() override;
+		bool IsActive() override;
 	};
 
 	/*class CallHook64 : public IHook
